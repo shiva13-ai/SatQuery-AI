@@ -1,0 +1,46 @@
+# SatQuery AI — ML Training Requirements
+# Install: pip install -r requirements_train.txt
+
+# Core ML
+torch==2.2.0
+torchvision==0.17.0
+torchaudio==2.2.0
+
+# HuggingFace ecosystem
+transformers==4.41.0
+datasets==2.19.0
+huggingface-hub==0.23.0
+accelerate==0.30.0
+peft==0.11.0          # LoRA / QLoRA
+safetensors==0.4.3
+tokenizers==0.19.1
+
+# Geospatial
+rasterio==1.3.10
+pyproj==3.6.1
+shapely==2.0.4
+
+# Vision
+Pillow==10.3.0
+opencv-python==4.9.0.80
+albumentations==1.4.7
+scikit-image==0.23.2
+
+# Numerics
+numpy==1.26.4
+scipy==1.13.0
+matplotlib==3.9.0
+pandas==2.2.2
+
+# Eval metrics
+nltk==3.8.1           # BLEU score
+rouge-score==0.1.2    # ROUGE
+pycocoevalcap==1.2    # CIDEr (optional, needs Java)
+
+# Utilities
+tqdm==4.66.4
+pyyaml==6.0.1
+tensorboard==2.17.0
+wandb==0.17.0         # optional — experiment tracking
+einops==0.8.0
+timm==0.9.16

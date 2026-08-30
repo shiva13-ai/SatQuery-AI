@@ -1,0 +1,119 @@
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL Database ──────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: satquery_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: satquery
+      POSTGRES_USER: satquery
+      POSTGRES_PASSWORD: satquery_secret_2025
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U satquery"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - satquery_net
+
+  # ── Redis (task queue + caching) ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: satquery_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - satquery_net
+
+  # ── FastAPI Backend ───────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: satquery_backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql+asyncpg://satquery:satquery_secret_2025@postgres:5432/satquery
+      REDIS_URL: redis://redis:6379
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      HF_TOKEN: ${HF_TOKEN:-}
+      MODEL_CACHE_DIR: /app/model_cache
+      MAX_IMAGE_SIZE_MB: 100
+      CORS_ORIGINS: "http://localhost,http://localhost:80,http://frontend"
+    volumes:
+      - model_cache:/app/model_cache
+      - uploads:/app/uploads
+      - reports:/app/reports
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - satquery_net
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ── Celery Worker (async model inference) ────────────────────────────────────
+  celery_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: satquery_worker
+    restart: unless-stopped
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      DATABASE_URL: postgresql+asyncpg://satquery:satquery_secret_2025@postgres:5432/satquery
+      REDIS_URL: redis://redis:6379
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      HF_TOKEN: ${HF_TOKEN:-}
+      MODEL_CACHE_DIR: /app/model_cache
+    volumes:
+      - model_cache:/app/model_cache
+      - uploads:/app/uploads
+      - reports:/app/reports
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - satquery_net
+
+  # ── Frontend (Nginx serving static HTML) ─────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: satquery_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - satquery_net
+
+volumes:
+  postgres_data:
+  model_cache:
+  uploads:
+  reports:
+
+networks:
+  satquery_net:
+    driver: bridge

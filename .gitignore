@@ -1,0 +1,15 @@
+# Python & Environment
+__pycache__/
+*.py[cod]
+venv/
+.env
+
+# Large Satellite & ML Weights
+*.tif
+*.tiff
+*.pth
+*.pt
+*.bin
+*.safetensors
+data/
+checkpoints/
